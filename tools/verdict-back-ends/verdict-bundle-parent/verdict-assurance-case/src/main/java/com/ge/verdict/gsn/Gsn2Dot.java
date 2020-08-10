@@ -56,6 +56,10 @@ public class Gsn2Dot {
         // traverse the GSN fragment and add each node to the list
         if (node.getNodeType().equalsIgnoreCase("context")) {
             allNodes.add(node);
+        } else if (node.getNodeType().equalsIgnoreCase("justification")) {
+            allNodes.add(node);
+        } else if (node.getNodeType().equalsIgnoreCase("assumption")) {
+            allNodes.add(node);
         } else if (node.getNodeType().equalsIgnoreCase("solution")) {
             allNodes.add(node);
             if (!(node.getInContextOf() == null)) {
@@ -75,6 +79,11 @@ public class Gsn2Dot {
                     getAllNodes(allNodes, subNode);
                 }
             }
+            if (!(node.getHasAssumptions() == null)) {
+                for (GsnNode subNode : node.getHasAssumptions()) {
+                    getAllNodes(allNodes, subNode);
+                }
+            }
         } else if (node.getNodeType().equalsIgnoreCase("strategy")) {
             allNodes.add(node);
             if (!(node.getInContextOf() == null)) {
@@ -84,6 +93,11 @@ public class Gsn2Dot {
             }
             if (!(node.getSupportedBy() == null)) {
                 for (GsnNode subNode : node.getSupportedBy()) {
+                    getAllNodes(allNodes, subNode);
+                }
+            }
+            if (!(node.getJustifiedBy() == null)) {
+                for (GsnNode subNode : node.getJustifiedBy()) {
                     getAllNodes(allNodes, subNode);
                 }
             }
@@ -106,6 +120,10 @@ public class Gsn2Dot {
             String nodeText = "";
             String hoverDisplay = "No additional information is available";
             String url = "";
+            String margin = "0.05";
+            String style = "bold";
+            String penwidth = "3.0";
+
             boolean nodeStatus = true;
 
             // deciding node shape and hovertext
@@ -118,6 +136,12 @@ public class Gsn2Dot {
                 if (!(node.getContext().getUrl() == null)) {
                     url = node.getContext().getUrl();
                 }
+            } else if (node.getNodeType().equalsIgnoreCase("justification")) {
+                nodeShape = "oval";
+                hoverDisplay = node.getJustification().getExtraInfo();
+            } else if (node.getNodeType().equalsIgnoreCase("assumption")) {
+                nodeShape = "oval";
+                hoverDisplay = node.getAssumption().getExtraInfo();
             } else if (node.getNodeType().equalsIgnoreCase("solution")) {
                 nodeShape = "circle";
                 nodeText = node.getSolution().getDisplayText();
@@ -144,11 +168,30 @@ public class Gsn2Dot {
             } else {
                 nodeColor = "red";
             }
-            if (node.getNodeType().equalsIgnoreCase("context")) {
+            if (node.getNodeType().equalsIgnoreCase("context")
+                    || node.getNodeType().equalsIgnoreCase("justification")
+                    || node.getNodeType().equalsIgnoreCase("assumption")) {
                 nodeColor = "black";
             }
 
             // writing string to declare node in dot file
+            //            String nodeDeclareString =
+            //                    node.getNodeId()
+            //                            + " ["
+            //                            + "href=\""
+            //                            + url
+            //                            + "\", tooltip=\""
+            //                            + hoverDisplay
+            //                            + "\", margin=0.05, style=bold, color="
+            //                            + nodeColor
+            //                            + ", shape="
+            //                            + nodeShape
+            //                            + ", penwidth = 3.0"
+            //                            + ", label=\""
+            //                            + node.getNodeId()
+            //                            + "\\n\\n"
+            //                            + nodeText
+            //                            + "\"];";
             String nodeDeclareString =
                     node.getNodeId()
                             + " ["
@@ -156,10 +199,16 @@ public class Gsn2Dot {
                             + url
                             + "\", tooltip=\""
                             + hoverDisplay
-                            + "\", margin=0.05, style=bold, color="
+                            + "\", margin=\""
+                            + margin
+                            + "\", style=\""
+                            + style
+                            + "\", color="
                             + nodeColor
                             + ", shape="
                             + nodeShape
+                            + ", penwidth ="
+                            + penwidth
                             + ", label=\""
                             + node.getNodeId()
                             + "\\n\\n"
@@ -187,7 +236,7 @@ public class Gsn2Dot {
                         node.getNodeId()
                                 + " -> "
                                 + support.getNodeId()
-                                + " [splines=curved, weight=3, arrowsize=2.0]");
+                                + " [splines=curved, penwidth = 2.0, weight=3, arrowsize=2.0]");
                 bw.newLine();
             }
             // inContextOf edges
@@ -196,7 +245,25 @@ public class Gsn2Dot {
                         node.getNodeId()
                                 + " -> "
                                 + context.getNodeId()
-                                + " [splines=curved, arrowhead=empty, arrowsize=1.0]");
+                                + " [splines=curved, penwidth = 2.0, arrowhead=empty, arrowsize=1.5]");
+                bw.newLine();
+            }
+            // justifiedBy edges
+            for (GsnNode justification : node.getJustifiedBy()) {
+                bw.write(
+                        node.getNodeId()
+                                + " -> "
+                                + justification.getNodeId()
+                                + " [splines=curved, penwidth = 2.0, arrowhead=empty, arrowsize=1.5]");
+                bw.newLine();
+            }
+            // hasAssumption edges
+            for (GsnNode assumption : node.getHasAssumptions()) {
+                bw.write(
+                        node.getNodeId()
+                                + " -> "
+                                + assumption.getNodeId()
+                                + " [splines=curved, penwidth = 2.0, arrowhead=empty, arrowsize=1.5]");
                 bw.newLine();
             }
         }

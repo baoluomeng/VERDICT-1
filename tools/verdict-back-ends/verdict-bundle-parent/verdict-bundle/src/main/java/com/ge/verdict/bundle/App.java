@@ -5,6 +5,7 @@ import com.ge.verdict.attackdefensecollector.AttackDefenseCollector;
 import com.ge.verdict.attackdefensecollector.CSVFile.MalformedInputException;
 import com.ge.verdict.attackdefensecollector.Prob;
 import com.ge.verdict.gsn.GSNInterface;
+import com.ge.verdict.gsn.SecurityGSNInterface;
 import com.ge.verdict.lustre.VerdictLustreTranslator;
 import com.ge.verdict.mbas.VDM2CSV;
 import com.ge.verdict.stem.VerdictStem;
@@ -175,12 +176,22 @@ public class App {
 
         options.addOption("c", false, "Cyber Relations Inference");
         options.addOption("s", false, "Safety Relations Inference");
+
         // TODO don't have a good short option because "s" is already taken
-        options.addOption("y", "synthesis", true, "Perform synthesis instead of Soteria++");
+        Option synthesis =
+                Option.builder("y")
+                        .desc("Perform synthesis instead of Soteria++")
+                        .longOpt("synthesis")
+                        .numberOfArgs(2)
+                        .argName("vdm")
+                        .argName("costModel")
+                        .build();
+        options.addOption(synthesis);
         options.addOption("o", "synthesis-output", true, "Synthesis output XML file");
         options.addOption("p", false, "Use partial solutions in synthesis");
 
         options.addOption("x", false, "Generate XML files for GSN");
+        options.addOption("z", false, "Generate GSN Fragments for Security Cases");
 
         for (String opt : crvThreats) {
             options.addOption(opt, false, "");
@@ -235,10 +246,10 @@ public class App {
         helpLine("      -c ................... cyber relations inference");
         helpLine("      -s ................... safety relations inference");
         helpLine(
-                "      --synthesis <cost model xml>"
+                "      --synthesis <vdm file> <cost model xml>"
                         + "                             perform synthesis instead of Soteria++");
         helpLine(
-                "      -o ................... synthesis output XML (required if synthesis enabled)");
+                "       -o ................... synthesis output XML (required if synthesis enabled)");
         helpLine("      -p ................... synthesis partial solutions");
         helpLine();
         helpLine("Toolchain: CRV (Cyber Resiliency Verifier)");
@@ -249,7 +260,7 @@ public class App {
         helpLine("      -MA .................. merit assignment");
         helpLine("      -BA .................. blame assignment");
         helpLine(
-                "      -C ................... component-level blame assignment (default link-level)");
+                "       -C ................... component-level blame assignment (default link-level)");
         helpLine("      -G ................... global blame assignment (default local)");
         helpLine(
                 "      <threats> ............. any combination of: [-LS] [-NI] [-LB] [-IT] [-OT] [-RI] [-SV] [-HT]");
@@ -258,10 +269,12 @@ public class App {
         helpLine("  --gsn <root id> <gsn out dir> <soteria out dir> <aadl project dir> [-x]");
         helpLine("   <root id> ............... the root goal id for the assurance case fragment");
         helpLine(
-                "   <gsn out dir> ........... the directory where the gsn fragments should be created");
+                "    <gsn out dir> ........... the directory where the gsn fragments should be created");
         helpLine("   <soteria out dir> ....... the directory where Soteria outputs are created");
         helpLine("   <aadl project dir> ...... the directory where the aadl files are present");
         helpLine("        -x ................. key to determine if xml should be created");
+        helpLine(
+                "        -z ................. key to determine if security assurance cases should be created");
         helpLine();
         helpLine("-d, --debug <dir> .......... Produce debug output");
         helpLine("      <dir> ................ Intermediary XML output directory");
@@ -313,11 +326,18 @@ public class App {
                         throw new VerdictRunException("Must specify synthesis output XML");
                     }
 
-                    String costModelPath = opts.getOptionValue("y");
+                    String[] synthesisOpts = opts.getOptionValues("y");
+                    if (synthesisOpts.length != 2) {
+                        throw new VerdictRunException("Missing --synthesis args");
+                    }
+
+                    String vdmFile = synthesisOpts[0];
+                    String costModelPath = synthesisOpts[1];
                     String output = opts.getOptionValue("o");
                     boolean partialSolution = opts.hasOption("p");
 
                     runMbasSynthesis(
+                            vdmFile,
                             csvProjectName,
                             stemProjectDir,
                             debugDir,
@@ -400,8 +420,13 @@ public class App {
             String soteriaOutputDir = gsnOpts[2];
             String caseAadlPath = gsnOpts[3];
             boolean generateXml = false;
+            boolean securityCases = false;
             if (opts.hasOption("x")) {
                 generateXml = true;
+            }
+
+            if (opts.hasOption("z")) {
+                securityCases = true;
             }
 
             runGsn(
@@ -410,6 +435,7 @@ public class App {
                     soteriaOutputDir,
                     caseAadlPath,
                     generateXml,
+                    securityCases,
                     modelName);
         }
     }
@@ -466,18 +492,38 @@ public class App {
             String soteriaOutputDir,
             String caseAadlPath,
             boolean generateXml,
+            boolean securityCases,
             String modelName)
             throws VerdictRunException {
         logHeader("GSN");
-        // calling the function to create GSN artefacts
-        GSNInterface createGsnObj = new GSNInterface();
 
-        try {
-            createGsnObj.runGsnArtifactsGenerator(
-                    rootGoalId, gsnOutputDir, soteriaOutputDir, caseAadlPath, generateXml);
-        } catch (IOException | ParserConfigurationException | SAXException e) {
-            // TODO Auto-generated catch block
-            throw new VerdictRunException("Failed to create GSN fragments", e);
+        if (!securityCases) {
+            // calling the function to create GSN artefacts
+            GSNInterface createGsnObj = new GSNInterface();
+
+            try {
+                createGsnObj.runGsnArtifactsGenerator(
+                        rootGoalId, gsnOutputDir, soteriaOutputDir, caseAadlPath, generateXml);
+            } catch (IOException | ParserConfigurationException | SAXException e) {
+                // TODO Auto-generated catch block
+                throw new VerdictRunException("Failed to create GSN fragments", e);
+            }
+        } else {
+            // calling the function to create GSN artefacts
+            SecurityGSNInterface createGsnObj = new SecurityGSNInterface();
+
+            try {
+                createGsnObj.runGsnArtifactsGenerator(
+                        rootGoalId,
+                        gsnOutputDir,
+                        soteriaOutputDir,
+                        caseAadlPath,
+                        securityCases,
+                        generateXml);
+            } catch (IOException | ParserConfigurationException | SAXException e) {
+                // TODO Auto-generated catch block
+                throw new VerdictRunException("Failed to create GSN fragments", e);
+            }
         }
 
         logHeader("Finished");
@@ -594,6 +640,7 @@ public class App {
      * @throws VerdictRunException
      */
     public static void runMbasSynthesis(
+            String vdmFile,
             String modelName,
             String stemProjectDir,
             String debugDir,
@@ -613,6 +660,7 @@ public class App {
         soteriaOutputDir.mkdirs();
         String soteriaPpOutputDir = soteriaOutputDir.getAbsolutePath();
 
+        checkFile(vdmFile, true, false, false, false, "xml");
         checkFile(stemCsvDir, true, true, true, false, null);
         checkFile(stemOutputDir, true, true, true, false, null);
         checkFile(stemGraphsDir, true, true, true, false, null);
@@ -668,7 +716,8 @@ public class App {
             CostModel costModel = new CostModel(new File(costModelPath));
 
             AttackDefenseCollector collector =
-                    new AttackDefenseCollector(stemOutputDir, cyberInference);
+                    new AttackDefenseCollector(
+                            new File(vdmFile), new File(stemOutputDir), cyberInference);
             List<AttackDefenseCollector.Result> results = collector.perform();
 
             boolean sat =
@@ -692,7 +741,14 @@ public class App {
                             false);
 
             if (selected.isPresent()) {
-                selected.get().toFileXml(new File(outputPath));
+                if (performMeritAssignment) {
+                    ResultsInstance withExtraDefProps =
+                            VerdictSynthesis.addExtraImplDefenses(
+                                    selected.get(), collector.getImplDal(), costModel);
+                    withExtraDefProps.toFileXml(new File(outputPath));
+                } else {
+                    selected.get().toFileXml(new File(outputPath));
+                }
                 log("Synthesis results output to " + outputPath);
             } else {
                 logError("Synthesis failed");
@@ -1022,7 +1078,9 @@ public class App {
         try {
             ExecuteStreamHandler redirect =
                     new PumpStreamHandler(new FileOutputStream(new File(outputPath)), System.err);
-            if (blameAssignment && instrumentor != null) {
+            if (blameAssignment
+                    && instrumentor != null
+                    && instrumentor.emptyIntrumentation() == false) {
                 Binary.invokeBin(
                         kind2Bin,
                         null,
@@ -1064,6 +1122,11 @@ public class App {
                             // Some properties invalid
                             log("Some properties are invalid");
                         }
+                        break;
+                    case 2:
+                        log("Kind2 terminated with an error");
+                        XMLProcessor.parseLog(new File(outputPath));
+                        // Terminate the process?
                         break;
                     case 0:
                         log("Kind2 timed out");
@@ -1133,17 +1196,22 @@ public class App {
         log("Input AADL project: " + aadlPath);
         log("Output IML file: " + imlPath);
         log("VERDICT Properties Name: " + propertySet);
+        System.out.println(); // Make any message provided by aadl2iml more visible
 
         try {
             Binary.invokeBin(aadl2imlBin, "-ps", propertySet, "-o", imlPath, aadlPath);
         } catch (Binary.ExecutionException e) {
-            throw new VerdictRunException("Failed to execute aadl2iml", e);
+            if (e.getCode().isPresent()) {
+                // If an exit code is present, aadl2iml should have printed a message
+                System.exit(2);
+            } else {
+                throw new VerdictRunException("Failed to execute aadl2iml", e);
+            }
         }
 
-        // For some reason, aadl2iml doesn't give a non-zero exit code when it fails
-        // But we can detect failure like this:
         if (!(new File(imlPath)).exists()) {
-            throw new VerdictRunException("Failed to execute aadl2iml, no output generated");
+            logError("Failed to execute aadl2iml, no output generated");
+            System.exit(2);
         }
     }
 

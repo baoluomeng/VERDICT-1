@@ -56,6 +56,10 @@ public class Instrumentor extends VDMInstrumentor {
         return this.attack_cmp_link_map;
     }
 
+    public boolean emptyIntrumentation() {
+        return emptySelection;
+    }
+
     public static Options createOptions() {
 
         final Options options = new Options();
@@ -118,10 +122,14 @@ public class Instrumentor extends VDMInstrumentor {
 
         Option it_opt = new Option("IT", "Insider Threat", false, "Insider Threat Instrumentation");
 
+        Option all_opt = new Option("AT", "ALL Threats", false, "Enable all attacks");
+
         Option bn_opt = new Option("BN", "Benign", false, "Benign (Default)");
 
         Option bm_opt =
                 new Option("B", "Blame Assignment", false, "Blame Assignment (Link Level) Default");
+
+        Option mt_opt = new Option("M", "Merit Assignment", false, "Merit Assignment");
 
         Option bl_opt =
                 new Option(
@@ -138,8 +146,11 @@ public class Instrumentor extends VDMInstrumentor {
         options.addOption(ri_opt);
         options.addOption(ot_opt);
         options.addOption(it_opt);
+        options.addOption(all_opt);
+
         options.addOption(bn_opt);
         options.addOption(bm_opt);
+        options.addOption(mt_opt);
         options.addOption(bl_opt);
 
         return options;
@@ -443,18 +454,6 @@ public class Instrumentor extends VDMInstrumentor {
 
         HashSet<String> ports = new HashSet<String>();
 
-        //        for (Connection con : vdm_links) {
-
-        //        ConnectionEnd con_end = link.getSource();
-        //        Port src_port = con_end.getComponentPort();
-        //
-        //        if (src_port == null) {
-        //            CompInstancePort instance_port = con_end.getSubcomponentPort();
-        //            src_port = instance_port.getPort();
-        //        }
-        //
-        //        ports.add(src_port.getName());
-
         ConnectionEnd con_end = link.getSource();
         Port dest_port = con_end.getComponentPort();
 
@@ -474,8 +473,6 @@ public class Instrumentor extends VDMInstrumentor {
         }
 
         ports.add(dest_port.getName());
-
-        //        }
 
         return ports;
     }

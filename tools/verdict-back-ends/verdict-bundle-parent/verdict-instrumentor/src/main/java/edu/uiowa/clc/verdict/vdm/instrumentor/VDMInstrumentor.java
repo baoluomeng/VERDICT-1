@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -30,6 +31,7 @@ import verdict.vdm.vdm_lustre.ContractItem;
 import verdict.vdm.vdm_lustre.ContractSpec;
 import verdict.vdm.vdm_lustre.Expression;
 import verdict.vdm.vdm_lustre.IfThenElse;
+import verdict.vdm.vdm_lustre.LustreProgram;
 import verdict.vdm.vdm_lustre.NodeBody;
 import verdict.vdm.vdm_lustre.NodeCall;
 import verdict.vdm.vdm_lustre.NodeEquation;
@@ -50,8 +52,16 @@ public class VDMInstrumentor {
 
     protected Model vdm_model;
 
+    protected Vector<Port> marked_ports = null;
+    protected Vector<ComponentType> marked_types = null;
+    protected boolean emptySelection = false;
+
     public VDMInstrumentor(Model vdm_model) {
+
         this.vdm_model = vdm_model;
+
+        this.marked_ports = new Vector<Port>();
+        this.marked_types = new Vector<ComponentType>();
     }
 
     // Attacks:
@@ -148,8 +158,6 @@ public class VDMInstrumentor {
         return blockImpl;
     }
 
-    //    protected String getComponentImpl(String componentID, Connection con) {}
-
     protected boolean isSourceComponent(Connection con) {
         if (con != null) {
             ConnectionEnd src = con.getSource();
@@ -181,6 +189,89 @@ public class VDMInstrumentor {
         return false;
     }
 
+    // Ignore Connection or Marked Ports.
+    private boolean ignoreMarkedLink(Connection con) {
+
+        ConnectionEnd srcConnection = con.getSource();
+        ComponentType srcType = null;
+
+        ConnectionEnd destConnection = con.getDestination();
+        ComponentType destType = null;
+
+        Port srcPort = srcConnection.getComponentPort();
+
+        if (srcPort == null) {
+            CompInstancePort compPort = srcConnection.getSubcomponentPort();
+            srcPort = compPort.getPort();
+
+            ComponentInstance srcCompInstance = compPort.getSubcomponent();
+            srcType = srcCompInstance.getSpecification();
+            if (srcType == null) {
+                ComponentImpl compImpl = srcCompInstance.getImplementation();
+                srcType = compImpl.getType();
+            }
+        }
+
+        Port destPort = destConnection.getComponentPort();
+
+        if (destPort == null) {
+            CompInstancePort compPort = destConnection.getSubcomponentPort();
+            destPort = compPort.getPort();
+
+            ComponentInstance destCompInstance = compPort.getSubcomponent();
+            destType = destCompInstance.getSpecification();
+            if (destType == null) {
+                ComponentImpl compImpl = destCompInstance.getImplementation();
+                destType = compImpl.getType();
+            }
+        }
+
+        if (this.marked_ports.contains(srcPort) || this.marked_ports.contains(destPort)) {
+            System.out.println("Ignore Port Connection:" + con.getName());
+            return true;
+        }
+
+        if (this.marked_types.contains(srcType) || this.marked_types.contains(destType)) {
+            System.out.println("Ignore Instance Connection:" + con.getName());
+            return true;
+        }
+
+        return false;
+    }
+
+    protected void identifyEmptyOutputComponents() {
+        for (ComponentType componentType : this.vdm_model.getComponentType()) {
+            Port mPort = markPort(componentType);
+
+            if (mPort != null) {
+                //                  System.out.println("Ignoring Node:" + componentType.getName());
+                System.out.println("Ignoring Port Instrumentation:" + mPort.getName());
+
+                this.marked_types.add(componentType);
+                this.marked_ports.add(mPort);
+            }
+        }
+    }
+
+    // Marked NonOutput Ports.
+    protected Port markPort(ComponentType componentType) {
+
+        Port markedPort = null;
+
+        for (Port port : componentType.getPort()) {
+
+            PortMode port_mode = port.getMode();
+
+            if (port_mode == PortMode.OUT) {
+                return null;
+            } else {
+                markedPort = port;
+            }
+        }
+
+        return markedPort;
+    }
+
     protected void retrieve_component_and_channels(
             Model vdm_model,
             List<String> threats,
@@ -189,6 +280,17 @@ public class VDMInstrumentor {
 
         HashSet<ComponentType> vdm_components = new HashSet<ComponentType>();
         HashSet<Connection> vdm_links = new HashSet<Connection>();
+
+        // Initialize Components with Empty Ports and Ignore
+        identifyEmptyOutputComponents();
+
+        // Initialize DataFlow for empty Implementations.
+        LustreProgram lt = vdm_model.getDataflowCode();
+
+        if (lt == null) {
+            lt = new LustreProgram();
+            vdm_model.setDataflowCode(lt);
+        }
 
         if (threats.contains("LS")) {
             System.out.println("Location Spoofing Instrumentation");
@@ -234,7 +336,7 @@ public class VDMInstrumentor {
             vdm_links.clear();
         }
 
-        int component_index = 1;
+        //        int component_index = 1;
 
         // Removed Once component Implemtation assumption.
         ComponentImpl componentImpl = retrieve_main_cmp_impl();
@@ -252,27 +354,25 @@ public class VDMInstrumentor {
             //            System.out.println("Selected Components:");
 
             for (ComponentType component : vdm_components) {
-                //                System.out.println("(" + component_index++ + ") " +
-                // component.getId());
 
-                //                if (blockImpl == null) {
                 blockImpl = retrieve_block(component);
-                //                }
 
                 HashSet<Connection> vdm_cmp_links = instrument_component(component, blockImpl);
 
                 for (Connection link_con : vdm_cmp_links) {
-                    if (!isProbePort(link_con)) {
-                        vdm_links.add(link_con);
+                    // Check if connection contains Empty Component on Port Ends.
+                    if (!ignoreMarkedLink(link_con)) {
+                        // Check if Port is Probe Port
+                        if (!isProbePort(link_con)) {
+                            vdm_links.add(link_con);
+                        }
                     }
                 }
-
                 components_map.put(component.getId(), vdm_cmp_links);
-                // if (component.getName().equals("GPS")) {}
             }
         }
 
-        // Snoorzing probe ports
+        // Snoorzing probe ports and Empty output components
         if (vdm_links.size() > 0) {
 
             Iterator<Connection> it = vdm_links.iterator();
@@ -280,15 +380,11 @@ public class VDMInstrumentor {
                 Connection con = it.next();
                 if (isProbePort(con)) {
                     it.remove();
+                } else if (ignoreMarkedLink(con)) {
+                    it.remove();
                 }
             }
         }
-
-        //        else {
-        //           System.out.println("No Component found!");
-        //        }
-
-        int connection_index = 1;
 
         HashSet<String> global_constants = new HashSet<String>();
 
@@ -341,6 +437,8 @@ public class VDMInstrumentor {
                     connections_map.put(connection, constant);
                 }
             }
+        } else {
+            emptySelection = true;
         }
 
         // Declare Global Constants
@@ -1407,7 +1505,7 @@ public class VDMInstrumentor {
         if (src_port != null) {
             String identifier = compImpl.getId();
             //            identifier = identifier.replace(".I", "_I");
-            identifier = identifier.replace(".", "_");
+            identifier = identifier.replace(".", "_dot_");
 
             src_componentInstance.setId(identifier);
             src_componentInstance.setName(identifier);
@@ -1525,7 +1623,7 @@ public class VDMInstrumentor {
         if (src_port != null) {
             String identifier = compImpl.getId();
             //            identifier = identifier.replace(".I", "_I");
-            identifier = identifier.replace(".", "_");
+            identifier = identifier.replace(".", "_dot_");
 
             src_componentInstance.setId(identifier);
             src_componentInstance.setName(identifier);
@@ -1552,7 +1650,7 @@ public class VDMInstrumentor {
         if (dest_port != null) {
             String identifier = compImpl.getId();
             //            identifier = identifier.replace(".I", "_I");
-            identifier = identifier.replace(".", "_");
+            identifier = identifier.replace(".", "_dot_");
 
             dest_componentInstance.setId(identifier);
             dest_componentInstance.setName(identifier);
@@ -1669,8 +1767,8 @@ public class VDMInstrumentor {
 
         ComponentImpl instrument_compImpl = new ComponentImpl();
 
-        instrument_compImpl.setId(instrumented_cmp.getId() + ".impl");
-        instrument_compImpl.setName(instrumented_cmp.getName() + "_Impl");
+        instrument_compImpl.setId(instrumented_cmp.getId() + "_dot_impl");
+        instrument_compImpl.setName(instrumented_cmp.getName() + "_dot_Impl");
         instrument_compImpl.setType(instrumented_cmp);
 
         IfThenElse ifelse = new IfThenElse();

@@ -63,12 +63,16 @@ public class CRVResultsView extends ViewPart {
 		// In practice, they will all be empty if blame assignment is turned off
 		// and components/links will be selected based on the -C flag
 		// (component/link-level instrumentation/blame assignment)
-		boolean showAttackType = tableContents.stream().anyMatch(CRVSummaryRow::hasAttackType);
-		boolean showCompromisedComponents = tableContents.stream().anyMatch(CRVSummaryRow::hasCompromisedComponents);
-		boolean showCompromisedLinks = tableContents.stream().anyMatch(CRVSummaryRow::hasCompromisedLinks);
-		boolean showUncompromisedComponents = tableContents.stream()
-				.anyMatch(CRVSummaryRow::hasUncompromisedComponents);
-		boolean showUncompromisedLinks = tableContents.stream().anyMatch(CRVSummaryRow::hasUncompromisedLinks);
+//		boolean showAttackType = tableContents.stream().anyMatch(CRVSummaryRow::hasAttackType);
+//		boolean showCompromisedComponents = tableContents.stream().anyMatch(CRVSummaryRow::hasCompromisedComponents);
+//		boolean showCompromisedLinks = tableContents.stream().anyMatch(CRVSummaryRow::hasCompromisedLinks);
+//		boolean showUncompromisedComponents = tableContents.stream()
+//				.anyMatch(CRVSummaryRow::hasUncompromisedComponents);
+//		boolean showUncompromisedLinks = tableContents.stream().anyMatch(CRVSummaryRow::hasUncompromisedLinks);
+
+		boolean showBlameAssignmentInfo =
+				CRVSettingsPanel.isBlameAssignment &&
+				tableContents.stream().anyMatch(CRVSummaryRow::hasCounterExample);;
 
 		composite = new Composite(parent, SWT.NONE);
 		composite.setLayout(new GridLayout(1, false));
@@ -86,27 +90,32 @@ public class CRVResultsView extends ViewPart {
 		TableColumn columnTwo = new TableColumn(table, SWT.CENTER | SWT.WRAP);
 		columnTwo.setText("Verification Result");
 		columnTwo.setWidth(500);
-		if (showAttackType) {
+		//if (showAttackType) {
+		if (showBlameAssignmentInfo) {
 			TableColumn columnThree = new TableColumn(table, SWT.CENTER | SWT.WRAP);
 			columnThree.setText("Attack Type");
 			columnsToShow.add(2);
 		}
-		if (showCompromisedComponents) {
+		//if (showCompromisedComponents) {
+		if (showBlameAssignmentInfo && CRVSettingsPanel.componentLevel) {
 			TableColumn columnFour = new TableColumn(table, SWT.CENTER | SWT.WRAP);
 			columnFour.setText("Critical Components");
 			columnsToShow.add(3);
 		}
-		if (showCompromisedLinks) {
+		//if (showCompromisedLinks) {
+		if (showBlameAssignmentInfo && !CRVSettingsPanel.componentLevel) {
 			TableColumn columnFive = new TableColumn(table, SWT.CENTER | SWT.WRAP);
 			columnFive.setText("Critical Links (Ports)");
 			columnsToShow.add(4);
 		}
-		if (showUncompromisedComponents) {
+		//if (showUncompromisedComponents) {
+		if (showBlameAssignmentInfo && CRVSettingsPanel.componentLevel) {
 			TableColumn columnSix = new TableColumn(table, SWT.CENTER | SWT.WRAP);
 			columnSix.setText("Selected Components");
 			columnsToShow.add(5);
 		}
-		if (showUncompromisedLinks) {
+		//if (showUncompromisedLinks) {
+		if (showBlameAssignmentInfo && !CRVSettingsPanel.componentLevel) {
 			TableColumn columnSeven = new TableColumn(table, SWT.CENTER | SWT.WRAP);
 			columnSeven.setText("Selected Links (Ports)");
 			columnsToShow.add(6);
@@ -181,73 +190,111 @@ public class CRVResultsView extends ViewPart {
 
 			@Override
 			public void mouseDown(MouseEvent e) {
-				if (table.getSelectionIndex() == -1) {
-					// If the table is empty
+				if (table.getSelectionIndex() == -1 || e.button != 3) {
+					// If the table is empty or not right button
 					return;
 				}
-				if (e.button == 3) {
+				
+				boolean invalidProperty =
+					!tableContents.get(table.getSelectionIndex()).getCounterExample().isEmpty();
+				
+				if (invalidProperty || CRVSettingsPanel.isMeritAssignment) {
 					Menu menu = new Menu(table.getShell(), SWT.POP_UP);
-					MenuItem counterExample = new MenuItem(menu, SWT.PUSH);
-					counterExample.setText("View Counter-example");
-					MenuItem testCase = new MenuItem(menu, SWT.PUSH);
-					testCase.setText("View Test Case");
-
-					counterExample.setEnabled(!tableContents.get(table.getSelectionIndex()).getCounterExample().isEmpty());
-					testCase.setEnabled(!tableContents.get(table.getSelectionIndex()).getTestCase().isEmpty());
-
-					counterExample.addSelectionListener(new SelectionListener() {
-						@Override
-						public void widgetDefaultSelected(SelectionEvent e) {
-							// Nothing here
-						}
-
-						@Override
-						public void widgetSelected(SelectionEvent e) {
-							if (!(table.getSelectionIndex() < 0)) {
-								CETable ce = new CETable(Display.getCurrent(), parent.getShell(),
-										tableContents.get(table.getSelectionIndex()).getCounterExample());
-								IWorkbenchPage wp = PlatformUI.getWorkbench().getActiveWorkbenchWindow()
-										.getActivePage();
-								IViewPart myView1 = wp.findView(CounterExampleView.ID_COUNTER_EXAMPLE);
-								if (myView1 != null) {
-									wp.hideView(myView1);
-								}
-								IViewPart myView2 = wp.findView(CounterExampleView.ID_TEST_CASE);
-								if (myView2 != null) {
-									wp.hideView(myView2);
-								}
-								String name = tableContents.get(table.getSelectionIndex()).getPropertyName();
-								showView(CRVReportGenerator.window, ce.getTableContents(), false, name);
+					
+					if (!invalidProperty) {
+						MenuItem meritAssignment = new MenuItem(menu, SWT.PUSH);
+						meritAssignment.setText("View Inductive Validity Core");
+						
+						meritAssignment.addSelectionListener(new SelectionListener() {
+							@Override
+							public void widgetDefaultSelected(SelectionEvent e) {
+								// Nothing here
 							}
-						}
-					});
-
-					testCase.addSelectionListener(new SelectionListener() {
-						@Override
-						public void widgetDefaultSelected(SelectionEvent e) {
-							// Nothing here
-						}
-
-						@Override
-						public void widgetSelected(SelectionEvent e) {
-							if (!(table.getSelectionIndex() < 0)) {
-								CETable ce = new CETable(Display.getCurrent(), parent.getShell(),
-										tableContents.get(table.getSelectionIndex()).getTestCase());
-								IWorkbenchPage wp = PlatformUI.getWorkbench().getActiveWorkbenchWindow()
-										.getActivePage();
-								IViewPart myView1 = wp.findView(CounterExampleView.ID_COUNTER_EXAMPLE);
-								if (myView1 != null) {
-									wp.hideView(myView1);
+	
+							@Override
+							public void widgetSelected(SelectionEvent e) {
+								if (!(table.getSelectionIndex() < 0)) {
+									
+									IWorkbenchPage wp = PlatformUI.getWorkbench().getActiveWorkbenchWindow()
+											.getActivePage();
+									IViewPart myView1 = wp.findView(MeritAssignmentView.ID);
+									if (myView1 != null) {
+										wp.hideView(myView1);
+									}
+									
+									CRVReportGenerator.window.getShell().getDisplay().asyncExec(() -> {
+										try {
+											CRVReportGenerator.window.getActivePage().showView(MeritAssignmentView.ID);
+										} catch (PartInitException ex) {
+											ex.printStackTrace();
+										}
+									});
 								}
-								IViewPart myView2 = wp.findView(CounterExampleView.ID_TEST_CASE);
-								if (myView2 != null) {
-									wp.hideView(myView2);
-								}
-								String name = tableContents.get(table.getSelectionIndex()).getPropertyName();
-								showView(CRVReportGenerator.window, ce.getTableContents(), true, name);
 							}
-						}
-					});
+						});
+					}
+					
+					if (invalidProperty) {
+						MenuItem counterExample = new MenuItem(menu, SWT.PUSH);
+						counterExample.setText("View Counter-example");
+						counterExample.addSelectionListener(new SelectionListener() {
+							@Override
+							public void widgetDefaultSelected(SelectionEvent e) {
+								// Nothing here
+							}
+	
+							@Override
+							public void widgetSelected(SelectionEvent e) {
+								if (!(table.getSelectionIndex() < 0)) {
+									CETable ce = new CETable(Display.getCurrent(), parent.getShell(),
+											tableContents.get(table.getSelectionIndex()).getCounterExample());
+									IWorkbenchPage wp = PlatformUI.getWorkbench().getActiveWorkbenchWindow()
+											.getActivePage();
+									IViewPart myView1 = wp.findView(CounterExampleView.ID_COUNTER_EXAMPLE);
+									if (myView1 != null) {
+										wp.hideView(myView1);
+									}
+									IViewPart myView2 = wp.findView(CounterExampleView.ID_TEST_CASE);
+									if (myView2 != null) {
+										wp.hideView(myView2);
+									}
+									String name = tableContents.get(table.getSelectionIndex()).getPropertyName();
+									showView(CRVReportGenerator.window, ce.getTableContents(), false, name);
+								}
+							}
+						});
+					}
+
+//					MenuItem testCase = new MenuItem(menu, SWT.PUSH);
+//					testCase.setText("View Test Case");
+//					testCase.setEnabled(!tableContents.get(table.getSelectionIndex()).getTestCase().isEmpty());
+
+//					testCase.addSelectionListener(new SelectionListener() {
+//						@Override
+//						public void widgetDefaultSelected(SelectionEvent e) {
+//							// Nothing here
+//						}
+//
+//						@Override
+//						public void widgetSelected(SelectionEvent e) {
+//							if (!(table.getSelectionIndex() < 0)) {
+//								CETable ce = new CETable(Display.getCurrent(), parent.getShell(),
+//										tableContents.get(table.getSelectionIndex()).getTestCase());
+//								IWorkbenchPage wp = PlatformUI.getWorkbench().getActiveWorkbenchWindow()
+//										.getActivePage();
+//								IViewPart myView1 = wp.findView(CounterExampleView.ID_COUNTER_EXAMPLE);
+//								if (myView1 != null) {
+//									wp.hideView(myView1);
+//								}
+//								IViewPart myView2 = wp.findView(CounterExampleView.ID_TEST_CASE);
+//								if (myView2 != null) {
+//									wp.hideView(myView2);
+//								}
+//								String name = tableContents.get(table.getSelectionIndex()).getPropertyName();
+//								showView(CRVReportGenerator.window, ce.getTableContents(), true, name);
+//							}
+//						}
+//					});
 
 					// draws pop up menu:
 					Point pt = new Point(e.x, e.y);

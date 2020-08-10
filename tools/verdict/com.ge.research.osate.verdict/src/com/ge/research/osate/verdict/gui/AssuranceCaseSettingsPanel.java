@@ -34,7 +34,8 @@ public class AssuranceCaseSettingsPanel extends ApplicationWindow {
 	public static boolean showInTab = true;
 	//variable to decide if xml should be generated
 	public static boolean generateXml = true ;
-
+	//variable to decide if security cases should be generated
+	public static boolean securityCases = false ;
 	
 	private Font font;
 	private Font boldFont;
@@ -90,9 +91,8 @@ public class AssuranceCaseSettingsPanel extends ApplicationWindow {
 	    Label idLabel = new Label(acsGroup, SWT.NULL);
 	    idLabel.setText("Enter Requirement Ids Below:");
 		idLabel.setFont(font);
-//        idLabel.setLayoutData(gd1);
 	    Label idLabel2 = new Label(acsGroup, SWT.NULL);
-	    idLabel2.setText("Eg:- Id1;Id2;Id3;");
+	    idLabel2.setText("Usage: Id1;Id2;Id3;...IdN;");
         Text idField = new Text(acsGroup, SWT.BORDER | SWT.LEFT);
         GridData gd2 = new GridData ();
         gd2.widthHint = 300;
@@ -101,6 +101,12 @@ public class AssuranceCaseSettingsPanel extends ApplicationWindow {
             idField.setText(rootGoalId);        	
         }
 	    
+        //Button to save settings for xml
+        Button securityCasesButton = new Button(acsGroup, SWT.CHECK);	
+        securityCasesButton.setText("Generate Security Cases");	
+        securityCasesButton.setFont(font);	
+        securityCasesButton.setSelection(securityCases);
+        
         //Button to save settings for xml
         Button xmlButton = new Button(acsGroup, SWT.CHECK);	
         xmlButton.setText("Generate XML Artifacts");	
@@ -141,6 +147,7 @@ public class AssuranceCaseSettingsPanel extends ApplicationWindow {
 				if (idField.getText()!=null) {
 					rootGoalId=idField.getText();
 				} 
+				securityCases = securityCasesButton.getSelection();
 				showInTab = showFragButton.getSelection();
 				generateXml = xmlButton.getSelection();
 				
