@@ -78,7 +78,7 @@ jobs:
         opam exec make
 
     - name: Build Docker image
-      uses: docker/build-push-action@v1.1
+      uses: docker/build-push-action@v1
       env:
         DOCKER_BUILDKIT: 1
       with:
