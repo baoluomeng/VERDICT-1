@@ -92,4 +92,6 @@ jobs:
         push: false
 
     - name: Inspect config.json
-      run: sudo find / -name config.json -ls
+      run: |
+        sudo ls -al /home/runner/work/_temp/_github_home/.docker
+        sudo cat /home/runner/work/_temp/_github_home/.docker/config.json
