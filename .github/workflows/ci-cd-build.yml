@@ -92,4 +92,4 @@ jobs:
         push: false
 
     - name: Inspect config.json
-      run: cat $HOME/.docker/config.json || echo file not found && find / -name config.json -ls
+      run: sudo find / -name config.json -ls
