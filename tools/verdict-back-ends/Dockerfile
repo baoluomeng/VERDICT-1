@@ -1,6 +1,6 @@
 # Cache metadata in our image to make subsequent builds faster
 
-#ARG BUILDKIT_INLINE_CACHE=1
+ARG BUILDKIT_INLINE_CACHE=1
 
 # Base our image on ubuntu:20.04 to be compatible with kind2's image
 

@@ -79,19 +79,14 @@ jobs:
 #
     - name: Build Docker image
       uses: docker/build-push-action@v1
-#      env:
-#        DOCKER_BUILDKIT: 1
+      env:
+        DOCKER_BUILDKIT: 1
       with:
         repository: gehighassurance/verdict-dev
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         tags: test
         path: tools/verdict-back-ends
-#        build_args: BUILDKIT_INLINE_CACHE=1
-#        cache_froms: gehighassurance/verdict-dev:latest
+        build_args: BUILDKIT_INLINE_CACHE=1
+        cache_froms: gehighassurance/verdict-dev:latest
         push: true
-
-    - name: Inspect config.json
-      run: |
-        sudo ls -al /home/runner/work/_temp/_github_home/.docker
-        sudo jq /home/runner/work/_temp/_github_home/.docker/config.json
