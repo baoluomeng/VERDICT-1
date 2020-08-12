@@ -89,9 +89,9 @@ jobs:
         path: tools/verdict-back-ends
 #        build_args: BUILDKIT_INLINE_CACHE=1
 #        cache_froms: gehighassurance/verdict-dev:latest
-        push: false
+        push: true
 
     - name: Inspect config.json
       run: |
         sudo ls -al /home/runner/work/_temp/_github_home/.docker
-        sudo cat /home/runner/work/_temp/_github_home/.docker/config.json
+        sudo jq /home/runner/work/_temp/_github_home/.docker/config.json
